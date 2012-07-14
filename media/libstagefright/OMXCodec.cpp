@@ -51,6 +51,7 @@
 #include <QCMetaData.h>
 #include <QOMX_AudioExtensions.h>
 #include <OMX_QCOMExtns.h>
+#include <gralloc_priv.h>
 #endif
 #include "include/avc_utils.h"
 
@@ -1966,11 +1967,21 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
     }
 
 #ifndef USE_SAMSUNG_COLORFORMAT
+#ifdef QCOM_ICS_COMPAT
+    int format = (def.format.video.eColorFormat ==
+            OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka)?
+            HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED : def.format.video.eColorFormat;
+#endif
     err = native_window_set_buffers_geometry(
             mNativeWindow.get(),
             def.format.video.nFrameWidth,
             def.format.video.nFrameHeight,
-            def.format.video.eColorFormat);
+#ifdef QCOM_ICS_COMPAT
+            format
+#else
+            def.format.video.eColorFormat
+#endif
+            );
 #else
     OMX_COLOR_FORMATTYPE eColorFormat;
 

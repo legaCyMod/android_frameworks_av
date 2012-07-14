@@ -80,6 +80,7 @@ LOCAL_SRC_FILES += \
         ExtendedExtractor.cpp
 
 LOCAL_C_INCLUDES += \
+        $(TOP)/hardware/qcom/display-legacy/libgralloc \
         $(TOP)/hardware/qcom/media/mm-core/inc
 
 ifeq ($(TARGET_QCOM_AUDIO_VARIANT),caf)
