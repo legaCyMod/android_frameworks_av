@@ -143,6 +143,9 @@ public:
                                   audio_stream_type_t stream,
                                   int session = 0);
             void doReleaseOutput(audio_io_handle_t output);
+#ifdef QCOM_FM_ENABLED
+    virtual status_t setFmVolume(float volume, int delayMs = 0);
+#endif
 
 private:
                         AudioPolicyService() ANDROID_API;
@@ -168,7 +171,10 @@ private:
             SET_PARAMETERS,
             SET_VOICE_VOLUME,
             STOP_OUTPUT,
-            RELEASE_OUTPUT
+            RELEASE_OUTPUT,
+#ifdef QCOM_FM_ENABLED
+            SET_FM_VOLUME
+#endif
         };
 
         AudioCommandThread (String8 name, const wp<AudioPolicyService>& service);
@@ -194,6 +200,9 @@ private:
                                                   int session);
                     void        releaseOutputCommand(audio_io_handle_t output);
 
+#ifdef QCOM_FM_ENABLED
+                    status_t    fmVolumeCommand(float volume, int delayMs = 0);
+#endif
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
 
     private:
@@ -249,6 +258,12 @@ private:
         public:
             audio_io_handle_t mIO;
         };
+#ifdef QCOM_FM_ENABLED
+        class FmVolumeData {
+        public:
+            float mVolume;
+        };
+#endif
 
         Mutex   mLock;
         Condition mWaitWorkCV;
