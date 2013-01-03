@@ -693,8 +693,8 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
 
     if (!strncasecmp(mMIME, "video/", 6)) {
 #ifdef QCOM_HARDWARE
-        if ((mFlags & kClientNeedsFramebuffer) && !strncmp(mComponentName, "OMX.qcom.", 9)) {
-            ALOGV("Enabling thumbnail mode.");
+        if ((!mFlags & kClientNeedsFramebuffer) && !strncmp(mComponentName, "OMX.qcom.", 9)) {
+            ALOGE("Enabling thumbnail mode.");
             QOMX_ENABLETYPE enableType;
             OMX_INDEXTYPE indexType;
 
