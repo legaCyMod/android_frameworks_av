@@ -1062,7 +1062,11 @@ void OMXCodec::setVideoInputFormat(
 
     video_def->nFrameWidth = width;
     video_def->nFrameHeight = height;
+#ifdef QCOM_LEGACY_OMX
+    video_def->xFramerate = (frameRate << 16);
+#else
     video_def->xFramerate = 0;      // No need for output port
+#endif
     video_def->nBitrate = bitRate;  // Q16 format
     video_def->eCompressionFormat = compressionFormat;
     video_def->eColorFormat = OMX_COLOR_FormatUnused;
