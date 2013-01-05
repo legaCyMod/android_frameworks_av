@@ -37,17 +37,29 @@ class MediaExtractor;
 
 typedef MediaExtractor* (*MediaExtractorFactory)(const sp<DataSource> &source, const char* mime);
 
+#ifdef QCOM_LEGACY_OMX
+static const char* MEDIA_CREATE_EXTRACTOR = "createExtractor";
+#else
 static const char* MEDIA_CREATE_EXTRACTOR = "CreateExtractor";
+#endif
+
+typedef void (*SnifferArrayFunc)(const DataSource::SnifferFunc* snifferArray[], int *count);
 
 typedef bool (*ExtendedExtractorSniffers)(const sp<DataSource> &source, String8 *mimeType,
                                           float *confidence,sp<AMessage> *meta);
 
 static const char* EXTENDED_EXTRACTOR_SNIFFERS = "SniffExtendedExtractor";
 
+static const char* MEDIA_SNIFFER_ARRAY = "snifferArray";
+
 class ExtendedExtractor
 {
 public:
     static MediaExtractor* CreateExtractor(const sp<DataSource> &source, const char *mime);
+
+#ifdef QCOM_LEGACY_OMX
+    static void RegisterSniffers();
+#endif
 };
 
 bool SniffExtendedExtractor(const sp<DataSource> &source, String8 *mimeType,

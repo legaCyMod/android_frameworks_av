@@ -124,10 +124,17 @@ void DataSource::RegisterDefaultSniffers() {
     RegisterSniffer(SniffMP3);
     RegisterSniffer(SniffAAC);
     RegisterSniffer(SniffMPEG2PS);
+#ifndef QCOM_LEGACY_OMX
+    // We haven't proprietary for it, and its brake ExtendedExtractor
     RegisterSniffer(SniffWVM);
-#ifdef QCOM_HARDWARE
-    RegisterSniffer(SniffExtendedExtractor);
 #endif
+#ifdef QCOM_HARDWARE
+#ifdef QCOM_LEGACY_OMX
+    ExtendedExtractor::RegisterSniffers();
+#else
+    RegisterSniffer(SniffExtendedExtractor);
+#endif // QCOM_LEGACY_OMX
+#endif // QCOM_HARDWARE
 
     char value[PROPERTY_VALUE_MAX];
     if (property_get("drm.service.enabled", value, NULL)

@@ -33,7 +33,11 @@
 
 #include "include/ExtendedExtractor.h"
 
+#ifdef QCOM_LEGACY_OMX
+static const char* EXTENDED_PARSER_LIB = "libmmparser.so";
+#else
 static const char* EXTENDED_PARSER_LIB = "libExtendedExtractor.so";
+#endif
 
 namespace android {
 
@@ -82,6 +86,37 @@ MediaExtractor* ExtendedExtractor::CreateExtractor(const sp<DataSource> &source,
 
     return extractor;
 }
+
+#ifdef QCOM_LEGACY_OMX
+void ExtendedExtractor::RegisterSniffers() {
+    void *extendedParserLib = ExtendedParserLib();
+    if (extendedParserLib == NULL) {
+        return;
+    }
+
+    SnifferArrayFunc snifferArrayFunc = (SnifferArrayFunc) dlsym(extendedParserLib, MEDIA_SNIFFER_ARRAY);
+    if(snifferArrayFunc==NULL) {
+        ALOGE(" Unable to init Extended Sniffers, dlerror = %s \n", dlerror());
+        return;
+    }
+
+    const DataSource::SnifferFunc *snifferArray = NULL;
+    int snifferCount = 0;
+
+    //Invoke function in libmmparser to return its array of sniffers.
+    snifferArrayFunc(&snifferArray, &snifferCount);
+
+    if(snifferArray==NULL) {
+        ALOGE(" snifferArray is NULL \n");
+        return;
+    }
+
+    //Register the remote sniffers with the DataSource.
+    for(int i=0; i<snifferCount; i++) {
+        DataSource::RegisterSniffer(snifferArray[i]);
+    }
+}
+#endif
 
 bool SniffExtendedExtractor(const sp<DataSource> &source, String8 *mimeType,
                             float *confidence,sp<AMessage> *meta) {
