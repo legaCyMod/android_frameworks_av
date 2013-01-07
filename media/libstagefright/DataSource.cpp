@@ -73,6 +73,10 @@ status_t DataSource::getSize(off64_t *size) {
 Mutex DataSource::gSnifferMutex;
 List<DataSource::SnifferFunc> DataSource::gSniffers;
 
+#ifdef QCOM_LEGACY_OMX
+List<DataSource::SnifferFunc>::iterator DataSource::extendedSnifferPosition;
+#endif
+
 bool DataSource::sniff(
         String8 *mimeType, float *confidence, sp<AMessage> *meta) {
     *mimeType = "";
@@ -82,6 +86,13 @@ bool DataSource::sniff(
     Mutex::Autolock autoLock(gSnifferMutex);
     for (List<SnifferFunc>::iterator it = gSniffers.begin();
          it != gSniffers.end(); ++it) {
+
+#ifdef QCOM_LEGACY_OMX
+        // Does'n try to use ExtendedExtractor if already found suitable from defaults
+        if(it == extendedSnifferPosition && *confidence > 0.0)
+            return true;
+#endif
+
         String8 newMimeType;
         float newConfidence;
         sp<AMessage> newMeta;
@@ -98,7 +109,11 @@ bool DataSource::sniff(
 }
 
 // static
+#ifdef QCOM_LEGACY_OMX
+void DataSource::RegisterSniffer(SnifferFunc func, bool isExtendedExtractor) {
+#else
 void DataSource::RegisterSniffer(SnifferFunc func) {
+#endif
     Mutex::Autolock autoLock(gSnifferMutex);
 
     for (List<SnifferFunc>::iterator it = gSniffers.begin();
@@ -109,6 +124,13 @@ void DataSource::RegisterSniffer(SnifferFunc func) {
     }
 
     gSniffers.push_back(func);
+
+#ifdef QCOM_LEGACY_OMX
+    if(isExtendedExtractor) {
+        extendedSnifferPosition = gSniffers.end();
+        extendedSnifferPosition--;
+    }
+#endif
 }
 
 // static
