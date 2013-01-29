@@ -66,10 +66,16 @@ LOCAL_SRC_FILES:=                         \
 LOCAL_C_INCLUDES:= \
         $(TOP)/frameworks/av/include/media/stagefright/timedtext \
         $(TOP)/frameworks/native/include/media/hardware \
-        $(TOP)/frameworks/native/include/media/openmax \
         $(TOP)/external/flac/include \
         $(TOP)/external/tremolo \
         $(TOP)/external/openssl/include
+
+ifneq ($(TI_CUSTOM_DOMX_PATH),)
+LOCAL_C_INCLUDES += $(TI_CUSTOM_DOMX_PATH)/omx_core/inc
+LOCAL_CPPFLAGS += -DUSE_TI_CUSTOM_DOMX
+else
+LOCAL_C_INCLUDES += $(TOP)/frameworks/native/include/media/openmax
+endif
 
 ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
 LOCAL_SRC_FILES += \
@@ -84,10 +90,13 @@ LOCAL_C_INCLUDES += \
         $(TOP)/hardware/qcom/media/mm-core/inc
 
 ifeq ($(TARGET_QCOM_AUDIO_VARIANT),caf)
+    ifeq ($(call is-board-platform-in-list,msm8660 msm7x27a msm7x30),true)
+        LOCAL_SRC_FILES += LPAPlayer.cpp
+    else
+        LOCAL_SRC_FILES += LPAPlayerALSA.cpp
+    endif
 LOCAL_CFLAGS += -DQCOM_ENHANCED_AUDIO
-LOCAL_SRC_FILES += \
-        LPAPlayerALSA.cpp                 \
-        TunnelPlayer.cpp
+LOCAL_SRC_FILES += TunnelPlayer.cpp
 endif
 endif
 
