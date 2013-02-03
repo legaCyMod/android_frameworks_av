@@ -77,6 +77,12 @@ else
 LOCAL_C_INCLUDES += $(TOP)/frameworks/native/include/media/openmax
 endif
 
+ifeq ($(BOARD_USES_STE_FMRADIO),true)
+LOCAL_SRC_FILES += \
+        FMRadioSource.cpp                 \
+        PCMExtractor.cpp
+endif
+
 ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
 LOCAL_SRC_FILES += \
         ExtendedWriter.cpp                \
@@ -159,6 +165,10 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/samsung/exynos4/hal/include \
 	$(TOP)/hardware/samsung/exynos4/include
 
+endif
+
+ifeq ($(BOARD_USE_TI_DUCATI_H264_PROFILE), true)
+LOCAL_CFLAGS += -DUSE_TI_DUCATI_H264_PROFILE
 endif
 
 LOCAL_MODULE:= libstagefright
