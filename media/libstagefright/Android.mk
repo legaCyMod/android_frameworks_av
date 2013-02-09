@@ -1,12 +1,6 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
-ifeq ($(BOARD_USES_ALSA_AUDIO),true)
-    ifeq ($(call is-chipset-in-board-platform,msm8960),true)
-        LOCAL_CFLAGS += -DUSE_TUNNEL_MODE
-    endif
-endif
-
 include frameworks/av/media/libstagefright/codecs/common/Config.mk
 
 LOCAL_SRC_FILES:=                         \
@@ -101,6 +95,12 @@ ifeq ($(TARGET_QCOM_AUDIO_VARIANT),caf)
     else
         LOCAL_SRC_FILES += LPAPlayerALSA.cpp
     endif
+    ifeq ($(BOARD_USES_ALSA_AUDIO),true)
+        ifeq ($(call is-chipset-in-board-platform,msm8960),true)
+            LOCAL_CFLAGS += -DUSE_TUNNEL_MODE
+            LOCAL_CFLAGS += -DTUNNEL_MODE_SUPPORTS_AMRWB
+        endif
+    endif
 LOCAL_CFLAGS += -DQCOM_ENHANCED_AUDIO
 LOCAL_SRC_FILES += TunnelPlayer.cpp
 endif
@@ -133,6 +133,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_STATIC_LIBRARIES := \
         libstagefright_color_conversion \
+        libstagefright_mp3dec \
         libstagefright_aacenc \
         libstagefright_matroska \
         libstagefright_timedtext \
