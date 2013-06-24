@@ -92,7 +92,8 @@ LOCAL_SRC_FILES += \
         QCMediaDefs.cpp                   \
         QCOMXCodec.cpp                    \
         WAVEWriter.cpp                    \
-        ExtendedExtractor.cpp
+        ExtendedExtractor.cpp             \
+        QCUtilityClass.cpp
 
 LOCAL_C_INCLUDES += \
         $(TOP)/hardware/qcom/display-legacy/libgralloc \
