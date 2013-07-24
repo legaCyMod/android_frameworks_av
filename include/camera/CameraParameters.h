@@ -671,8 +671,11 @@ public:
     static const char KEY_CONTI_BURST_STATE[];
     static const char KEY_SUPPORTED_CAPTURE_MODES[];
     static const char KEY_MIN_CONTRAST[];
+    static const char KEY_DEF_CONTRAST[];
     static const char KEY_MIN_SHARPNESS[];
+    static const char KEY_DEF_SHARPNESS[];
     static const char KEY_MIN_SATURATION[];
+    static const char KEY_DEF_SATURATION[];
     static const char KEY_SINGLE_ISP_OUTPUT_ENABLED[];
     static const char POST_PROCESSING_ENABLE[];
     static const char POST_PROCESSING_BYPASS[];
@@ -747,6 +750,15 @@ public:
     static const char EFFECT_WHITEBOARD[];
     static const char EFFECT_BLACKBOARD[];
     static const char EFFECT_AQUA[];
+#ifdef SAMSUNG_CAMERA_HARDWARE
+    static const char EFFECT_CARTOONIZE[];
+    static const char EFFECT_POINT_RED_YELLOW[];
+    static const char EFFECT_POINT_GREEN[];
+    static const char EFFECT_POINT_BLUE[];
+    static const char EFFECT_VINTAGE_COLD[];
+    static const char EFFECT_VINTAGE_WARM[];
+    static const char EFFECT_WASHED[];
+#endif
 #ifdef QCOM_HARDWARE
     static const char EFFECT_EMBOSS[];
     static const char EFFECT_SKETCH[];
