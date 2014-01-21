@@ -143,7 +143,7 @@ public:
                                   audio_stream_type_t stream,
                                   int session = 0);
             void doReleaseOutput(audio_io_handle_t output);
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
     virtual status_t setFmVolume(float volume, int delayMs = 0);
 #endif
 
@@ -172,7 +172,7 @@ private:
             SET_VOICE_VOLUME,
             STOP_OUTPUT,
             RELEASE_OUTPUT,
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
             SET_FM_VOLUME
 #endif
         };
@@ -200,7 +200,7 @@ private:
                                                   int session);
                     void        releaseOutputCommand(audio_io_handle_t output);
 
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
                     status_t    fmVolumeCommand(float volume, int delayMs = 0);
 #endif
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
@@ -258,7 +258,7 @@ private:
         public:
             audio_io_handle_t mIO;
         };
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
         class FmVolumeData {
         public:
             float mVolume;

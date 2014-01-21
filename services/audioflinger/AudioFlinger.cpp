@@ -1332,7 +1332,7 @@ status_t AudioFlinger::getRenderPosition(size_t *halFrames, size_t *dspFrames,
     return BAD_VALUE;
 }
 
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
 status_t AudioFlinger::setFmVolume(float value)
 {
     status_t ret = initCheck();

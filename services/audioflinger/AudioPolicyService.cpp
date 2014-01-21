@@ -798,7 +798,7 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     mLock.lock();
                     delete data;
                     }break;
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
                 case SET_FM_VOLUME: {
                     FmVolumeData *data = (FmVolumeData *)command->mParam;
                     ALOGV("AudioCommandThread() processing set fm volume volume %f", data->mVolume);
@@ -995,7 +995,7 @@ void AudioPolicyService::AudioCommandThread::releaseOutputCommand(audio_io_handl
     mWaitWorkCV.signal();
 }
 
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
 status_t AudioPolicyService::AudioCommandThread::fmVolumeCommand(float volume, int delayMs)
 {
     status_t status = NO_ERROR;
@@ -1094,7 +1094,7 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(AudioCommand *comma
             // command status as the command is now delayed
             delayMs = 1;
         } break;
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
         case SET_FM_VOLUME: {
             removedCommands.add(command2);
             command->mTime = command2->mTime;
@@ -1172,7 +1172,7 @@ int AudioPolicyService::setStreamVolume(audio_stream_type_t stream,
                                                    output, delayMs);
 }
 
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
 status_t AudioPolicyService::setFmVolume(float volume, int delayMs)
 {
     return mAudioCommandThread->fmVolumeCommand(volume, delayMs);
@@ -1718,7 +1718,7 @@ static int aps_set_voice_volume(void *service, float volume, int delay_ms)
     return audioPolicyService->setVoiceVolume(volume, delay_ms);
 }
 
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
 static int aps_set_fm_volume(void *service, float volume, int delay_ms)
 {
     AudioPolicyService *audioPolicyService = (AudioPolicyService *)service;
@@ -1746,7 +1746,7 @@ namespace {
         stop_tone             : aps_stop_tone,
         set_voice_volume      : aps_set_voice_volume,
         move_effects          : aps_move_effects,
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
         set_fm_volume         : aps_set_fm_volume,
 #endif
         load_hw_module        : aps_load_hw_module,

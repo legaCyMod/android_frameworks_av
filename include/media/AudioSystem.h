@@ -118,7 +118,7 @@ public:
         audio_channel_mask_t channelMask, size_t* buffSize);
 
     static status_t setVoiceVolume(float volume);
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
     static status_t setFmVolume(float volume);
 #endif
 

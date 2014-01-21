@@ -71,7 +71,7 @@ enum {
     GET_EFFECT_DESCRIPTOR,
     CREATE_EFFECT,
     MOVE_EFFECTS,
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
     SET_FM_VOLUME,
 #endif
     LOAD_HW_MODULE,
@@ -754,7 +754,7 @@ public:
         return reply.readInt32();
     }
 
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
     virtual status_t setFmVolume(float volume)
     {
         Parcel data, reply;
@@ -1188,7 +1188,7 @@ status_t BnAudioFlinger::onTransact(
             reply->writeInt32(moveEffects(session, srcOutput, dstOutput));
             return NO_ERROR;
         } break;
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
         case SET_FM_VOLUME: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             float volume = data.readFloat();

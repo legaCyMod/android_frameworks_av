@@ -253,7 +253,7 @@ public:
     virtual status_t moveEffects(int sessionId, audio_io_handle_t srcOutput,
                         audio_io_handle_t dstOutput);
 
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
     virtual status_t setFmVolume(float volume);
 #endif
 
@@ -744,7 +744,7 @@ private:
         AUDIO_HW_SET_MIC_MUTE,          // set_mic_mute
         AUDIO_HW_SET_VOICE_VOLUME,      // set_voice_volume
         AUDIO_HW_SET_PARAMETER,         // set_parameters
-#ifdef QCOM_FM_ENABLED
+#ifdef QCOM_MR1_FM
         AUDIO_SET_FM_VOLUME,
 #endif
         AUDIO_HW_GET_INPUT_BUFFER_SIZE, // get_input_buffer_size
