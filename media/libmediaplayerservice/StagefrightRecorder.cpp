@@ -893,7 +893,7 @@ exit:
 }
 
 sp<MediaSource> StagefrightRecorder::createAudioSource() {
-#ifdef ENABLE_QC_AV_ENHANCEMENTS
+#if defined(ENABLE_QC_AV_ENHANCEMENTS) && !defined(NO_TUNNELED_SOURCE)
     bool tunneledSource = false;
     const char *tunnelMime;
     {

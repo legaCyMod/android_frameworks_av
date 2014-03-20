@@ -83,6 +83,10 @@ ifeq ($(TARGET_ENABLE_QC_AV_ENHANCEMENTS),true)
     endif
 endif #TARGET_ENABLE_QC_AV_ENHANCEMENTS
 
+ifeq ($(TARGET_BOARD_PLATFORM),msm7x27a)
+    LOCAL_CFLAGS += -DNO_TUNNELED_SOURCE
+endif
+
 include $(BUILD_SHARED_LIBRARY)
 
 include $(call all-makefiles-under,$(LOCAL_PATH))
