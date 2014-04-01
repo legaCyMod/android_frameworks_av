@@ -344,6 +344,13 @@ uint32_t OMXCodec::getComponentQuirks(
                 index, "supports-multiple-frames-per-input-buffer")) {
         quirks |= kSupportsMultipleFramesPerInputBuffer;
     }
+<<<<<<< HEAD
+=======
+    if (list->codecHasQuirk(
+                index, "requires-larger-encoder-output-buffer")) {
+        quirks |= kRequiresLargerEncoderOutputBuffer;
+    }
+>>>>>>> parent of 0f4d10e... camera: Remove deprecated HTC camera support code
     if (list->codecHasQuirk(
                 index, "requires-allocate-on-input-ports")) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
