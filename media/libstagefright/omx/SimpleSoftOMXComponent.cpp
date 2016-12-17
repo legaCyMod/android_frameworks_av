@@ -125,6 +125,10 @@ OMX_ERRORTYPE SimpleSoftOMXComponent::internalGetParameter(
             OMX_PARAM_PORTDEFINITIONTYPE *defParams =
                 (OMX_PARAM_PORTDEFINITIONTYPE *)params;
 
+            if (!isValidOMXParam(defParams)) {
+                return OMX_ErrorBadParameter;
+            }
+
             if (defParams->nPortIndex >= mPorts.size()
                     || defParams->nSize
                             != sizeof(OMX_PARAM_PORTDEFINITIONTYPE)) {
@@ -151,6 +155,10 @@ OMX_ERRORTYPE SimpleSoftOMXComponent::internalSetParameter(
         {
             OMX_PARAM_PORTDEFINITIONTYPE *defParams =
                 (OMX_PARAM_PORTDEFINITIONTYPE *)params;
+
+            if (!isValidOMXParam(defParams)) {
+                return OMX_ErrorBadParameter;
+            }
 
             if (defParams->nPortIndex >= mPorts.size()
                     || defParams->nSize
@@ -460,6 +468,13 @@ void SimpleSoftOMXComponent::onPortEnable(OMX_U32 portIndex, bool enable) {
     PortInfo *port = &mPorts.editItemAt(portIndex);
     CHECK_EQ((int)port->mTransition, (int)PortInfo::NONE);
     CHECK(port->mDef.bEnabled == !enable);
+
+    if (port->mDef.eDir != OMX_DirOutput) {
+        ALOGE("Port enable/disable allowed only on output ports.");
+        notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+        android_errorWriteLog(0x534e4554, "29421804");
+        return;
+    }
 
     if (!enable) {
         port->mDef.bEnabled = OMX_FALSE;

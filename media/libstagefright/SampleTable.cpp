@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#define __STDINT_MACROS
+#define __STDINT_LIMITS
+
 #define LOG_TAG "SampleTable"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
@@ -27,11 +30,6 @@
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/Utils.h>
 
-/* TODO: remove after being merged into other branches */
-#ifndef UINT32_MAX
-#define UINT32_MAX       (4294967295U)
-#endif
-
 namespace android {
 
 // static
@@ -44,6 +42,8 @@ const uint32_t SampleTable::kSampleSizeType32 = FOURCC('s', 't', 's', 'z');
 const uint32_t SampleTable::kSampleSizeTypeCompact = FOURCC('s', 't', 'z', '2');
 
 ////////////////////////////////////////////////////////////////////////////////
+
+const off64_t kMaxOffset = INT64_MAX;
 
 struct SampleTable::CompositionDeltaLookup {
     CompositionDeltaLookup();
@@ -121,6 +121,7 @@ SampleTable::SampleTable(const sp<DataSource> &source)
       mSampleSizeFieldSize(0),
       mDefaultSampleSize(0),
       mNumSampleSizes(0),
+      mHasTimeToSample(false),
       mTimeToSampleCount(0),
       mTimeToSample(NULL),
       mSampleTimeEntries(NULL),
@@ -131,7 +132,8 @@ SampleTable::SampleTable(const sp<DataSource> &source)
       mNumSyncSamples(0),
       mSyncSamples(NULL),
       mLastSyncSampleIndex(0),
-      mSampleToChunkEntries(NULL) {
+      mSampleToChunkEntries(NULL),
+      mTotalSize(0) {
     mSampleIterator = new SampleIterator(this);
 }
 
@@ -142,6 +144,9 @@ SampleTable::~SampleTable() {
     delete[] mSyncSamples;
     mSyncSamples = NULL;
 
+    delete[] mTimeToSample;
+    mTimeToSample = NULL;
+
     delete mCompositionDeltaLookup;
     mCompositionDeltaLookup = NULL;
 
@@ -151,9 +156,6 @@ SampleTable::~SampleTable() {
     delete[] mSampleTimeEntries;
     mSampleTimeEntries = NULL;
 
-    delete[] mTimeToSample;
-    mTimeToSample = NULL;
-
     delete mSampleIterator;
     mSampleIterator = NULL;
 }
@@ -162,7 +164,7 @@ bool SampleTable::isValid() const {
     return mChunkOffsetOffset >= 0
         && mSampleToChunkOffset >= 0
         && mSampleSizeOffset >= 0
-        && mTimeToSample != NULL;
+        && mHasTimeToSample;
 }
 
 status_t SampleTable::setChunkOffsetParams(
@@ -231,25 +233,63 @@ status_t SampleTable::setSampleToChunkParams(
 
     mNumSampleToChunkOffsets = U32_AT(&header[4]);
 
-    if (data_size < 8 + mNumSampleToChunkOffsets * 12) {
+    if ((data_size - 8) / sizeof(SampleToChunkEntry) < mNumSampleToChunkOffsets) {
         return ERROR_MALFORMED;
     }
 
-    if (SIZE_MAX / sizeof(SampleToChunkEntry) <= mNumSampleToChunkOffsets)
+    if ((uint64_t)kMaxTotalSize / sizeof(SampleToChunkEntry) <=
+            (uint64_t)mNumSampleToChunkOffsets) {
+        ALOGE("Sample-to-chunk table size too large.");
         return ERROR_OUT_OF_RANGE;
+    }
+    mTotalSize += (uint64_t)mNumSampleToChunkOffsets *
+            sizeof(SampleToChunkEntry);
+    if (mTotalSize > kMaxTotalSize) {
+        ALOGE("Sample-to-chunk table size would make sample table too large.\n"
+              "    Requested sample-to-chunk table size = %llu\n"
+              "    Eventual sample table size >= %llu\n"
+              "    Allowed sample table size = %llu\n",
+              (unsigned long long)mNumSampleToChunkOffsets *
+                      sizeof(SampleToChunkEntry),
+              (unsigned long long)mTotalSize,
+              (unsigned long long)kMaxTotalSize);
+        return ERROR_OUT_OF_RANGE;
+    }
 
     mSampleToChunkEntries =
-        new SampleToChunkEntry[mNumSampleToChunkOffsets];
+        new (std::nothrow) SampleToChunkEntry[mNumSampleToChunkOffsets];
+    if (!mSampleToChunkEntries) {
+        ALOGE("Cannot allocate sample-to-chunk table with %llu entries.",
+                (unsigned long long)mNumSampleToChunkOffsets);
+        return ERROR_OUT_OF_RANGE;
+    }
+
+    if (mNumSampleToChunkOffsets == 0) {
+        return OK;
+    }
+
+    if ((off64_t)(kMaxOffset - 8 -
+            ((mNumSampleToChunkOffsets - 1) * sizeof(SampleToChunkEntry)))
+            < mSampleToChunkOffset) {
+        return ERROR_MALFORMED;
+    }
 
     for (uint32_t i = 0; i < mNumSampleToChunkOffsets; ++i) {
-        uint8_t buffer[12];
+        uint8_t buffer[sizeof(SampleToChunkEntry)];
+
         if (mDataSource->readAt(
-                    mSampleToChunkOffset + 8 + i * 12, buffer, sizeof(buffer))
+                    mSampleToChunkOffset + 8 + i * sizeof(SampleToChunkEntry),
+                    buffer,
+                    sizeof(buffer))
                 != (ssize_t)sizeof(buffer)) {
             return ERROR_IO;
         }
 
-        CHECK(U32_AT(buffer) >= 1);  // chunk index is 1 based in the spec.
+        // chunk index is 1 based in the spec.
+        if (U32_AT(buffer) < 1) {
+            ALOGE("b/23534160");
+            return ERROR_OUT_OF_RANGE;
+        }
 
         // We want the chunk index to be 0-based.
         mSampleToChunkEntries[i].startChunk = U32_AT(buffer) - 1;
@@ -325,7 +365,7 @@ status_t SampleTable::setSampleSizeParams(
 
 status_t SampleTable::setTimeToSampleParams(
         off64_t data_offset, size_t data_size) {
-    if (mTimeToSample != NULL || data_size < 8) {
+    if (mHasTimeToSample || data_size < 8) {
         return ERROR_MALFORMED;
     }
 
@@ -341,22 +381,51 @@ status_t SampleTable::setTimeToSampleParams(
     }
 
     mTimeToSampleCount = U32_AT(&header[4]);
-    uint64_t allocSize = (uint64_t)mTimeToSampleCount * 2 * sizeof(uint32_t);
-    if (allocSize > SIZE_MAX) {
+    if (mTimeToSampleCount > UINT32_MAX / (2 * sizeof(uint32_t))) {
+        // Choose this bound because
+        // 1) 2 * sizeof(uint32_t) is the amount of memory needed for one
+        //    time-to-sample entry in the time-to-sample table.
+        // 2) mTimeToSampleCount is the number of entries of the time-to-sample
+        //    table.
+        // 3) We hope that the table size does not exceed UINT32_MAX.
+        ALOGE("Time-to-sample table size too large.");
         return ERROR_OUT_OF_RANGE;
     }
-    mTimeToSample = new uint32_t[mTimeToSampleCount * 2];
 
-    size_t size = sizeof(uint32_t) * mTimeToSampleCount * 2;
-    if (mDataSource->readAt(
-                data_offset + 8, mTimeToSample, size) < (ssize_t)size) {
+    // Note: At this point, we know that mTimeToSampleCount * 2 will not
+    // overflow because of the above condition.
+
+    uint64_t allocSize = (uint64_t)mTimeToSampleCount * 2 * sizeof(uint32_t);
+    mTotalSize += allocSize;
+    if (mTotalSize > kMaxTotalSize) {
+        ALOGE("Time-to-sample table size would make sample table too large.\n"
+              "    Requested time-to-sample table size = %llu\n"
+              "    Eventual sample table size >= %llu\n"
+              "    Allowed sample table size = %llu\n",
+              (unsigned long long)allocSize,
+              (unsigned long long)mTotalSize,
+              (unsigned long long)kMaxTotalSize);
+        return ERROR_OUT_OF_RANGE;
+    }
+
+    mTimeToSample = new (std::nothrow) uint32_t[mTimeToSampleCount * 2];
+    if (!mTimeToSample) {
+        ALOGE("Cannot allocate time-to-sample table with %llu entries.",
+                (unsigned long long)mTimeToSampleCount);
+        return ERROR_OUT_OF_RANGE;
+    }
+
+    if (mDataSource->readAt(data_offset + 8, mTimeToSample,
+            (size_t)allocSize) < (ssize_t)allocSize) {
+        ALOGE("Incomplete data read for time-to-sample table.");
         return ERROR_IO;
     }
 
-    for (uint32_t i = 0; i < mTimeToSampleCount * 2; ++i) {
+    for (size_t i = 0; i < mTimeToSampleCount * 2; ++i) {
         mTimeToSample[i] = ntohl(mTimeToSample[i]);
     }
 
+    mHasTimeToSample = true;
     return OK;
 }
 
@@ -389,15 +458,31 @@ status_t SampleTable::setCompositionTimeToSampleParams(
 
     mNumCompositionTimeDeltaEntries = numEntries;
     uint64_t allocSize = (uint64_t)numEntries * 2 * sizeof(uint32_t);
-    if (allocSize > SIZE_MAX) {
+    if (allocSize > kMaxTotalSize) {
+        ALOGE("Composition-time-to-sample table size too large.");
         return ERROR_OUT_OF_RANGE;
     }
 
-    mCompositionTimeDeltaEntries = new uint32_t[2 * numEntries];
+    mTotalSize += allocSize;
+    if (mTotalSize > kMaxTotalSize) {
+        ALOGE("Composition-time-to-sample table would make sample table too large.\n"
+              "    Requested composition-time-to-sample table size = %llu\n"
+              "    Eventual sample table size >= %llu\n"
+              "    Allowed sample table size = %llu\n",
+              (unsigned long long)allocSize,
+              (unsigned long long)mTotalSize,
+              (unsigned long long)kMaxTotalSize);
+        return ERROR_OUT_OF_RANGE;
+    }
 
-    if (mDataSource->readAt(
-                data_offset + 8, mCompositionTimeDeltaEntries, numEntries * 8)
-            < (ssize_t)numEntries * 8) {
+    mCompositionTimeDeltaEntries = new (std::nothrow) uint32_t[2 * numEntries];
+    if (!mCompositionTimeDeltaEntries) {
+        ALOGE("Cannot allocate composition-time-to-sample table with %llu "
+                "entries.", (unsigned long long)numEntries);
+        return ERROR_OUT_OF_RANGE;
+    }
+    if (mDataSource->readAt(data_offset + 8, mCompositionTimeDeltaEntries,
+            (size_t)allocSize) < (ssize_t)allocSize) {
         delete[] mCompositionTimeDeltaEntries;
         mCompositionTimeDeltaEntries = NULL;
 
@@ -438,15 +523,33 @@ status_t SampleTable::setSyncSampleParams(off64_t data_offset, size_t data_size)
         ALOGV("Table of sync samples is empty or has only a single entry!");
     }
 
-    uint64_t allocSize = mNumSyncSamples * (uint64_t)sizeof(uint32_t);
-    if (allocSize > SIZE_MAX) {
+    uint64_t allocSize = (uint64_t)mNumSyncSamples * sizeof(uint32_t);
+    if (allocSize > kMaxTotalSize) {
+          ALOGE("Sync sample table size too large.");
+          return ERROR_OUT_OF_RANGE;
+    }
+
+    mTotalSize += allocSize;
+    if (mTotalSize > kMaxTotalSize) {
+        ALOGE("Sync sample table size would make sample table too large.\n"
+              "    Requested sync sample table size = %llu\n"
+              "    Eventual sample table size >= %llu\n"
+              "    Allowed sample table size = %llu\n",
+              (unsigned long long)allocSize,
+              (unsigned long long)mTotalSize,
+              (unsigned long long)kMaxTotalSize);
         return ERROR_OUT_OF_RANGE;
     }
 
-    mSyncSamples = new uint32_t[mNumSyncSamples];
-    size_t size = mNumSyncSamples * sizeof(uint32_t);
-    if (mDataSource->readAt(mSyncSampleOffset + 8, mSyncSamples, size)
-            != (ssize_t)size) {
+    mSyncSamples = new (std::nothrow) uint32_t[mNumSyncSamples];
+    if (!mSyncSamples) {
+        ALOGE("Cannot allocate sync sample table with %llu entries.",
+                (unsigned long long)mNumSyncSamples);
+        return ERROR_OUT_OF_RANGE;
+    }
+
+    if (mDataSource->readAt(mSyncSampleOffset + 8, mSyncSamples,
+            (size_t)allocSize) != (ssize_t)allocSize) {
         return ERROR_IO;
     }
 
@@ -511,7 +614,24 @@ void SampleTable::buildSampleEntriesTable() {
         return;
     }
 
-    mSampleTimeEntries = new SampleTimeEntry[mNumSampleSizes];
+    mTotalSize += (uint64_t)mNumSampleSizes * sizeof(SampleTimeEntry);
+    if (mTotalSize > kMaxTotalSize) {
+        ALOGE("Sample entry table size would make sample table too large.\n"
+              "    Requested sample entry table size = %llu\n"
+              "    Eventual sample table size >= %llu\n"
+              "    Allowed sample table size = %llu\n",
+              (unsigned long long)mNumSampleSizes * sizeof(SampleTimeEntry),
+              (unsigned long long)mTotalSize,
+              (unsigned long long)kMaxTotalSize);
+        return;
+    }
+
+    mSampleTimeEntries = new (std::nothrow) SampleTimeEntry[mNumSampleSizes];
+    if (!mSampleTimeEntries) {
+        ALOGE("Cannot allocate sample entry table with %llu entries.",
+                (unsigned long long)mNumSampleSizes);
+        return;
+    }
 
     uint32_t sampleIndex = 0;
     uint64_t sampleTime = 0;

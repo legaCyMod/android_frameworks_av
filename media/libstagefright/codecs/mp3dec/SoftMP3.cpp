@@ -118,6 +118,17 @@ void SoftMP3::initDecoder() {
     mIsFirst = true;
 }
 
+void *SoftMP3::memsetSafe(OMX_BUFFERHEADERTYPE *outHeader, int c, size_t len) {
+    if (len > outHeader->nAllocLen) {
+        ALOGE("memset buffer too small: got %lu, expected %zu", outHeader->nAllocLen, len);
+        android_errorWriteLog(0x534e4554, "29422022");
+        notify(OMX_EventError, OMX_ErrorUndefined, OUTPUT_BUFFER_TOO_SMALL, NULL);
+        mSignalledError = true;
+        return NULL;
+    }
+    return memset(outHeader->pBuffer, c, len);
+}
+
 OMX_ERRORTYPE SoftMP3::internalGetParameter(
         OMX_INDEXTYPE index, OMX_PTR params) {
     switch (index) {
@@ -125,6 +136,10 @@ OMX_ERRORTYPE SoftMP3::internalGetParameter(
         {
             OMX_AUDIO_PARAM_PCMMODETYPE *pcmParams =
                 (OMX_AUDIO_PARAM_PCMMODETYPE *)params;
+
+            if (!isValidOMXParam(pcmParams)) {
+                return OMX_ErrorBadParameter;
+            }
 
             if (pcmParams->nPortIndex > 1) {
                 return OMX_ErrorUndefined;
@@ -144,6 +159,27 @@ OMX_ERRORTYPE SoftMP3::internalGetParameter(
             return OMX_ErrorNone;
         }
 
+        case OMX_IndexParamAudioMp3:
+        {
+            OMX_AUDIO_PARAM_MP3TYPE *mp3Params =
+                (OMX_AUDIO_PARAM_MP3TYPE *)params;
+
+            if (!isValidOMXParam(mp3Params)) {
+                return OMX_ErrorBadParameter;
+            }
+
+            if (mp3Params->nPortIndex > 1) {
+                return OMX_ErrorUndefined;
+            }
+
+            mp3Params->nChannels = mNumChannels;
+            mp3Params->nBitRate = 0 /* unknown */;
+            mp3Params->nSampleRate = mSamplingRate;
+            // other fields are encoder-only
+
+            return OMX_ErrorNone;
+        }
+
         default:
             return SimpleSoftOMXComponent::internalGetParameter(index, params);
     }
@@ -156,6 +192,10 @@ OMX_ERRORTYPE SoftMP3::internalSetParameter(
         {
             const OMX_PARAM_COMPONENTROLETYPE *roleParams =
                 (const OMX_PARAM_COMPONENTROLETYPE *)params;
+
+            if (!isValidOMXParam(roleParams)) {
+                return OMX_ErrorBadParameter;
+            }
 
             if (strncmp((const char *)roleParams->cRole,
                         "audio_decoder.mp3",
@@ -170,6 +210,10 @@ OMX_ERRORTYPE SoftMP3::internalSetParameter(
         {
             const OMX_AUDIO_PARAM_PCMMODETYPE *pcmParams =
                 (const OMX_AUDIO_PARAM_PCMMODETYPE *)params;
+
+            if (!isValidOMXParam(pcmParams)) {
+                return OMX_ErrorBadParameter;
+            }
 
             if (pcmParams->nPortIndex != 1) {
                 return OMX_ErrorUndefined;
@@ -212,7 +256,9 @@ void SoftMP3::onQueueFilled(OMX_U32 portIndex) {
                 outHeader->nFilledLen =
                     kPVMP3DecoderDelay * mNumChannels * sizeof(int16_t);
 
-                memset(outHeader->pBuffer, 0, outHeader->nFilledLen);
+                if (!memsetSafe(outHeader, 0, outHeader->nFilledLen)) {
+                    return;
+                }
             } else {
                 // Since we never discarded frames from the start, we won't have
                 // to add any padding at the end either.
@@ -240,6 +286,14 @@ void SoftMP3::onQueueFilled(OMX_U32 portIndex) {
         mConfig->inputBufferUsedLength = 0;
 
         mConfig->outputFrameSize = kOutputBufferSize / sizeof(int16_t);
+        if ((int32)outHeader->nAllocLen < mConfig->outputFrameSize) {
+            ALOGE("input buffer too small: got %lu, expected %u",
+                outHeader->nAllocLen, mConfig->outputFrameSize);
+            android_errorWriteLog(0x534e4554, "27793371");
+            notify(OMX_EventError, OMX_ErrorUndefined, OUTPUT_BUFFER_TOO_SMALL, NULL);
+            mSignalledError = true;
+            return;
+        }
 
         mConfig->pOutputBuffer =
             reinterpret_cast<int16_t *>(outHeader->pBuffer);
@@ -267,9 +321,9 @@ void SoftMP3::onQueueFilled(OMX_U32 portIndex) {
 
             // This is recoverable, just ignore the current frame and
             // play silence instead.
-            memset(outHeader->pBuffer,
-                   0,
-                   mConfig->outputFrameSize * sizeof(int16_t));
+            if (!memsetSafe(outHeader, 0, mConfig->outputFrameSize * sizeof(int16_t))) {
+                return;
+            }
 
             mConfig->inputBufferUsedLength = inHeader->nFilledLen;
         } else if (mConfig->samplingRate != mSamplingRate
